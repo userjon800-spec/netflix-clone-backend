@@ -30,7 +30,7 @@ class AuthController {
       res.status(200).json({ message: "Muvaffaqiyatli login", token });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+      res.status(400).json({ message: "Xatolik iltimos keyinroq urining" });
     }
   }
   async register(req, res) {
@@ -79,7 +79,19 @@ class AuthController {
     }
   }
   logout(req, res) {
-    res.clearCookie("token", { path: "/" });
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    };
+    res.clearCookie("token", {
+      ...cookieOptions,
+    });
+    res.cookie("token", "", {
+      ...cookieOptions,
+      expires: new Date(0),
+    });
     res.status(200).json({ message: "Logged out" });
   }
 }
