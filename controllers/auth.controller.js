@@ -94,5 +94,46 @@ class AuthController {
     });
     res.status(200).json({ message: "Logged out" });
   }
+  async resetPass(req, res) {
+    try {
+      const { resetPass, id } = req.body;
+      const pass = await bcrypt.hash(String(resetPass), 10);
+      console.log(pass);
+      await userModel.findByIdAndUpdate(id, { resetPass: pass }, { new: true });
+      res.status(200).json({ message: "Succes" });
+    } catch (error) {
+      console.error(error);
+      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async reset(req, res) {
+    try {
+      const { reset, email } = req.body;
+      const user = await userModel.find({ email }).lean();
+      if (!user.length) {
+        return res.status(401).json({ message: "Bunday user mavjud emas" });
+      }
+      const pass = bcrypt.compare(reset, user[0].password);
+      if (pass) {
+        res.status(200).json({ message: "Correct", userId: user[0]._id });
+      } else {
+        res.status(402).json({ message: "Parol xato" });
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async newPassword(req, res) {
+    try {
+      const {password, id} = req.body;
+      const hash = await bcrypt.hash(password, 10)
+      await userModel.findByIdAndUpdate(id, {password:hash}, {new: true})
+      res.status(200).json({message: "Succes"})
+    } catch (error) {
+      console.error(error);
+      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
 }
 module.exports = new AuthController();

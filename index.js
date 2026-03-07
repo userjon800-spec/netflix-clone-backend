@@ -2,7 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const cookieParser =  require("cookie-parser")
 const router = require("./routes/auth.route");
-const { default: mongoose } = require("mongoose");
+const userRoute = require('./routes/user.route')
+const { mongoose } = require("mongoose");
 const app = express();
 const cors = require("cors")
 const PORT = process.env.PORT || 7800;
@@ -14,10 +15,11 @@ app.use(cors({
   origin: 'http://localhost:3000'
 }))
 app.use("/api", router);  
+app.use("/api", userRoute);
 mongoose
   .connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDb ishga tushdi"))
-  .catch(() => console.error("Xatolik"));
+  .catch((err) => console.error("Xatolik", err));
 app.listen(PORT, () => {
   console.log(`Server ${PORT} ishga tushdi`);
 });
