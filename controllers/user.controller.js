@@ -1,6 +1,7 @@
 const userModel = require("../models/user.model");
 const bcrypt = require("bcrypt");
-const movieModel = require("../models/movie.model");
+const movieModel = require("../models/liked-movie.model");
+const savedMovieModel = require("../models/saved-movie.model");
 class UserController {
   async getUser(req, res) {
     try {
@@ -12,7 +13,7 @@ class UserController {
       res.status(200).json(user);
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
     }
   }
   async updateUser(req, res) {
@@ -22,13 +23,16 @@ class UserController {
       res.status(202).json({ message: "Updated user" });
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
     }
   }
   async updatePassword(req, res) {
     try {
       const { oldPass, newPass, id } = req.body;
       const user = await userModel.findById(id).lean();
+      if (!user) {
+        return res.status(404).json({ message: "User topilmadi" });
+      }
       const newPassword = await bcrypt.compare(String(oldPass), user.password);
       if (!newPassword) {
         return res.status(404).json({ message: "Parol xato" });
@@ -42,27 +46,65 @@ class UserController {
       res.status(202).json({ message: "Load new password" });
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
     }
   }
   async likedMovie(req, res) {
     try {
       await movieModel.create(req.body);
-      res.status(200).json({message: 'Succes'})
+      res.status(200).json({ message: "Succes" });
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
     }
   }
   async unLikedMovie(req, res) {
     try {
-      const {id}=req.params
-      const unLike = await movieModel.find({id}).lean()
-      await movieModel.findByIdAndDelete(unLike)
-      res.status(200).json({message: 'UnLike succes'})
+      const { id } = req.params;
+      const unLike = await movieModel.find({ id }).lean();
+      await movieModel.findByIdAndDelete(unLike[0]._id);
+      res.status(200).json({ message: "UnLike succes" });
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: "Xatolik iltimos keyinroq urining" });
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async LikeMovie(req, res) {
+    try {
+      const movie = await movieModel.find().lean();
+      res.status(200).json(movie);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async savedMovie(req, res) {
+    try {
+      await savedMovieModel.create(req.body);
+      res.status(200).json({ message: "Succes" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async unSavedMovie(req, res) {
+    try {
+      const { id } = req.params;
+      const unSave = await savedMovieModel.find({ id }).lean();
+      await savedMovieModel.findByIdAndDelete(unSave[0]._id);
+      res.status(200).json({ message: "Unsave succes" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async SavedMovie(req, res) {
+    try {
+      const movie = await savedMovieModel.find().lean();
+      res.status(200).json(movie);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
     }
   }
 }

@@ -1,8 +1,12 @@
 const userController = require("../controllers/user.controller");
 const router = require("express").Router();
 router.get("/user/:id", userController.getUser);
+router.get("/user-liked", userController.LikeMovie);
+router.get("/user-saved", userController.SavedMovie);
 router.put("/user-update", userController.updateUser);
 router.put("/user-pass", userController.updatePassword);
 router.post("/liked-movie", userController.likedMovie);
+router.post("/saved-movie", userController.savedMovie);
 router.delete("/un-liked-movie/:id", userController.unLikedMovie);
+router.delete("/un-saved-movie/:id", userController.unSavedMovie);
 module.exports = router;
