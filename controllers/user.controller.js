@@ -71,7 +71,8 @@ class UserController {
   }
   async LikeMovie(req, res) {
     try {
-      const movie = await movieModel.find().lean();
+      const { id } = req.params;
+      const movie = await movieModel.find({ userId: id }).lean();
       res.status(200).json(movie);
     } catch (error) {
       console.error(error);
@@ -100,8 +101,23 @@ class UserController {
   }
   async SavedMovie(req, res) {
     try {
-      const movie = await savedMovieModel.find().lean();
+      const { id } = req.params;
+      const movie = await savedMovieModel.find({userId: id }).lean();
       res.status(200).json(movie);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async addAvatar(req, res) {
+    try {
+      const { url } = req.body;
+      await userModel.findByIdAndUpdate(
+        req.user.id,
+        { avatar: url },
+        { new: true },
+      );
+      res.status(200).json({ message: "Upload Completed" });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });

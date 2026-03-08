@@ -10,6 +10,7 @@ const userSchema = new Schema(
     },
     resetPass: { type: String },
     likedMovies: [{ type: Schema.Types.ObjectId, ref: "Movie", default: [] }],
+    savedMovies: [{ type: Schema.Types.ObjectId, ref: "SavedMovie", default: [] }],
   },
   { timestamps: true },
 );

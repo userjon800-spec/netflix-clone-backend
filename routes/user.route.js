@@ -1,9 +1,11 @@
 const userController = require("../controllers/user.controller");
+const authMiddleware = require("../middleware/auth.middleware");
 const router = require("express").Router();
 router.get("/user/:id", userController.getUser);
-router.get("/user-liked", userController.LikeMovie);
-router.get("/user-saved", userController.SavedMovie);
+router.get("/user-liked/:id", userController.LikeMovie);
+router.get("/user-saved/:id", userController.SavedMovie);
 router.put("/user-update", userController.updateUser);
+router.put("/user-avatar", authMiddleware, userController.addAvatar);
 router.put("/user-pass", userController.updatePassword);
 router.post("/liked-movie", userController.likedMovie);
 router.post("/saved-movie", userController.savedMovie);
