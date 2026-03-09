@@ -3,14 +3,23 @@ const userSchema = new Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    password: {
+      type: String,
+      required: function () {
+        return this.provider === "local";
+      },
+    },
     avatar: {
       type: String,
       default: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
     },
     resetPass: { type: String },
-    likedMovies: [{ type: Schema.Types.ObjectId, ref: "Movie", default: [] }],
-    savedMovies: [{ type: Schema.Types.ObjectId, ref: "SavedMovie", default: [] }],
+    provider: {
+      type: String,
+      enum: ["local", "google", "github"],
+      default: "local",
+    },
+    providerId: { type: String, default: null },
   },
   { timestamps: true },
 );

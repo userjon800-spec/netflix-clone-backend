@@ -6,7 +6,7 @@ const movieSchema = new Schema({
   release_date: { type: String, required: true },
   genre_ids: { type: Array },
   video: { type: Boolean },
-  ids: Number,
+  id: Number,
   original_language: { type: String },
   original_title: { type: String },
   overview: { type: String },

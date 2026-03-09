@@ -2,6 +2,7 @@ const userModel = require("../models/user.model");
 const bcrypt = require("bcrypt");
 const movieModel = require("../models/liked-movie.model");
 const savedMovieModel = require("../models/saved-movie.model");
+const { default: axios } = require("axios");
 class UserController {
   async getUser(req, res) {
     try {
@@ -102,7 +103,7 @@ class UserController {
   async SavedMovie(req, res) {
     try {
       const { id } = req.params;
-      const movie = await savedMovieModel.find({userId: id }).lean();
+      const movie = await savedMovieModel.find({ userId: id }).lean();
       res.status(200).json(movie);
     } catch (error) {
       console.error(error);
@@ -118,6 +119,40 @@ class UserController {
         { new: true },
       );
       res.status(200).json({ message: "Upload Completed" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async setPasswordOAuth(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res.status(404).json({ message: "Id o'rnating" });
+      }
+      const { password } = req.body;
+      if (!password) {
+        return res.status(404).json({ message: "Password o'rnating" });
+      }
+      const hashedPass = await bcrypt.hash(password, 10);
+      await userModel.findByIdAndUpdate(
+        id,
+        { password: hashedPass },
+        { new: true },
+      );
+      res.status(200).json({ message: "Password success" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
+    }
+  }
+  async getUpcoming(req,res){
+    try {
+      const upcoming = await fetch(`https://api.themoviedb.org/3/movie/upcoming?api_key=${process.env.TMDB_KEY_API}`)
+      console.log(upcoming);
+      const upcomingJSON = await upcoming.json()
+      
+      res.status(200).json({upcomingJSON})
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
