@@ -146,13 +146,37 @@ class UserController {
       res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });
     }
   }
-  async getUpcoming(req,res){
+  async getAPI(req, res) {
     try {
-      const upcoming = await fetch(`https://api.themoviedb.org/3/movie/upcoming?api_key=${process.env.TMDB_KEY_API}`)
-      console.log(upcoming);
-      const upcomingJSON = await upcoming.json()
-      
-      res.status(200).json({upcomingJSON})
+      const upcoming = await fetch(
+        `https://api.themoviedb.org/3/movie/upcoming?api_key=${process.env.TMDB_KEY_API}`,
+      );
+      const action = await fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=28`,
+      );
+      const comedy = await fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=35`,
+      );
+      const horror = await fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=27`,
+      );
+      const animation = await fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=16`,
+      );
+      const upcomingJSON = await upcoming.json(),
+        actionJSON = await action.json(),
+        comedyJSON = await comedy.json(),
+        horrorJSON = await horror.json(),
+        animationJSON = await animation.json();
+      res
+        .status(200)
+        .json({
+          upcomingJSON,
+          actionJSON,
+          comedyJSON,
+          horrorJSON,
+          animationJSON,
+        });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Xatolik iltimos keyinroq urining" });

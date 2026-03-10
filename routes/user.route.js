@@ -2,7 +2,7 @@ const userController = require("../controllers/user.controller");
 const authMiddleware = require("../middleware/auth.middleware");
 const router = require("express").Router();
 router.get("/user/:id", userController.getUser);
-router.get("/user-upcoming", userController.getUpcoming);
+router.get("/user-api", userController.getAPI);
 router.get("/user-liked/:id", userController.LikeMovie);
 router.get("/user-saved/:id", userController.SavedMovie);
 router.put("/user-update", userController.updateUser);
