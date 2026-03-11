@@ -1,6 +1,7 @@
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const authController = require("../controllers/auth.controller");
+const authMiddleware = require("../middleware/auth.middleware");
 const router = require("express").Router();
 // Google start
 router.get(
@@ -61,9 +62,9 @@ router.get(
 );
 router.post("/login", authController.login);
 router.post("/register", authController.register);
-router.get("/me", authController.me);
+router.get("/me", authMiddleware, authController.me);
 router.post("/logout", authController.logout);
-router.post("/reset-pass", authController.resetPass);
-router.post("/reset", authController.reset);
-router.post("/new-password", authController.newPassword);
+router.post("/reset-pass", authMiddleware, authController.resetPass);
+router.post("/reset", authMiddleware, authController.reset);
+router.post("/new-password", authMiddleware, authController.newPassword);
 module.exports = router;

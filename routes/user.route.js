@@ -1,16 +1,20 @@
 const userController = require("../controllers/user.controller");
 const authMiddleware = require("../middleware/auth.middleware");
 const router = require("express").Router();
-router.get("/user/:id", userController.getUser);
-router.get("/user-api", userController.getAPI);
-router.get("/user-liked/:id", userController.LikeMovie);
-router.get("/user-saved/:id", userController.SavedMovie);
-router.put("/user-update", userController.updateUser);
+router.get("/user/:id", authMiddleware, userController.getUser);
+router.get("/user-api", authMiddleware, userController.getAPI);
+router.get("/user-liked/:id", authMiddleware, userController.LikeMovie);
+router.get("/user-saved/:id", authMiddleware, userController.SavedMovie);
+router.put("/user-update", authMiddleware, userController.updateUser);
 router.put("/user-avatar", authMiddleware, userController.addAvatar);
-router.put("/user-pass", userController.updatePassword);
-router.put("/user-set-pass/:id", userController.setPasswordOAuth);
-router.post("/liked-movie", userController.likedMovie);
-router.post("/saved-movie", userController.savedMovie);
+router.put("/user-pass", authMiddleware, userController.updatePassword);
+router.put(
+  "/user-set-pass/:id",
+  authMiddleware,
+  userController.setPasswordOAuth,
+);
+router.post("/liked-movie", authMiddleware, userController.likedMovie);
+router.post("/saved-movie", authMiddleware, userController.savedMovie);
 router.delete("/un-liked-movie/:id", userController.unLikedMovie);
 router.delete("/un-saved-movie/:id", userController.unSavedMovie);
 module.exports = router;
