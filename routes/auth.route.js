@@ -24,7 +24,11 @@ router.get(
     failureRedirect: "http://localhost:3000/auth/signin",
   }),
   (req, res) => {
-    const payload = { id: req.user._id, email: req.user.email };
+    const payload = {
+      id: req.user._id,
+      email: req.user.email,
+      role: req.user.role,
+    };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
@@ -46,7 +50,11 @@ router.get(
     failureRedirect: "http://localhost:3000/auth/signin",
   }),
   (req, res) => {
-    const payload = { id: req.user._id, email: req.user.email };
+    const payload = {
+      id: req.user._id,
+      email: req.user.email,
+      role: req.user.role,
+    };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });

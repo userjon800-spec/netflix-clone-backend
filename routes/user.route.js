@@ -15,6 +15,14 @@ router.put(
 );
 router.post("/liked-movie", authMiddleware, userController.likedMovie);
 router.post("/saved-movie", authMiddleware, userController.savedMovie);
-router.delete("/un-liked-movie/:id", userController.unLikedMovie);
-router.delete("/un-saved-movie/:id", userController.unSavedMovie);
+router.delete(
+  "/un-liked-movie/:id",
+  authMiddleware,
+  userController.unLikedMovie,
+);
+router.delete(
+  "/un-saved-movie/:id",
+  authMiddleware,
+  userController.unSavedMovie,
+);
 module.exports = router;

@@ -153,7 +153,7 @@ class AuthController {
       if (pass) {
         res.status(200).json({ message: "Correct", userId: user[0]._id });
       } else {
-        res.status(402).json({ message: "Parol xato" });
+        res.status(401).json({ message: "Parol xato" });
       }
     } catch (error) {
       throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
