@@ -23,8 +23,8 @@ class AuthController {
         });
         res.cookie("token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
+          secure: true,
+          sameSite: "none",
           maxAge: 24 * 60 * 60 * 1000,
           path: "/",
         });
@@ -48,8 +48,8 @@ class AuthController {
       });
       res.cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
       });
@@ -81,8 +81,8 @@ class AuthController {
       });
       res.cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
       });
@@ -113,8 +113,8 @@ class AuthController {
   logout(req, res) {
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none",
       path: "/",
     };
     res.clearCookie("token", {
