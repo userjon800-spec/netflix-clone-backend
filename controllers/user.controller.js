@@ -35,7 +35,9 @@ class UserController {
     try {
       const { oldPass, newPass, id } = req.body;
       if (!oldPass || !newPass || !id) {
-        throw BaseError.BadRequest("Eski parolingiz, Yangi parolingiz majburiy");
+        throw BaseError.BadRequest(
+          "Eski parolingiz, Yangi parolingiz majburiy",
+        );
       }
       const user = await userModel.findById(id).lean();
       if (!user) {
@@ -86,8 +88,13 @@ class UserController {
   async LikeMovie(req, res) {
     try {
       const { id } = req.params;
+      if (!id) {
+        throw BaseError.BadRequest("Id o'rnating");
+      }
+      console.log(id);
       const movie = await movieModel.find({ userId: id }).lean();
-      if (!movie.length) {
+      console.log(movie);
+      if (!movie) {
         return res.status(404).json({ message: "Movie topilmadi" });
       }
       res.status(200).json(movie);
@@ -125,8 +132,11 @@ class UserController {
   async SavedMovie(req, res) {
     try {
       const { id } = req.params;
+      if (!id) {
+        throw BaseError.BadRequest("Id o'rnating");
+      }
       const movie = await savedMovieModel.find({ userId: id }).lean();
-      if (!movie.length) {
+      if (!movie) {
         return res.status(404).json({ message: "Movie topilmadi" });
       }
       res.status(200).json(movie);
