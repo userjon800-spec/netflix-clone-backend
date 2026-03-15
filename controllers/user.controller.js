@@ -91,9 +91,7 @@ class UserController {
       if (!id) {
         throw BaseError.BadRequest("Id o'rnating");
       }
-      console.log(id);
       const movie = await movieModel.find({ userId: id }).lean();
-      console.log(movie);
       if (!movie) {
         return res.status(404).json({ message: "Movie topilmadi" });
       }
