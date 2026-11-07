@@ -3,214 +3,313 @@ const bcrypt = require("bcrypt");
 const movieModel = require("../models/liked-movie.model");
 const savedMovieModel = require("../models/saved-movie.model");
 const BaseError = require("../errors/base.error");
+const axios = require("axios");
+
 class UserController {
-  async getUser(req, res) {
+  async getUser(req, res, next) {
     try {
-      const { id } = req.params;
+      const id = req.params.id || req.user?.id;
       if (!id) {
-        return res.status(404).json({ message: "Id o'rnating" });
+        throw BaseError.BadRequest("Foydalanuvchi ID si topilmadi");
       }
-      const user = await userModel.findById(id).lean();
+      const user = await userModel.findById(id).select("-password -resetPass").lean();
       if (!user) {
-        return res.status(404).json({ message: "User topilmadi" });
+        throw BaseError.NotFound("Foydalanuvchi topilmadi");
       }
-      res.status(200).json(user);
+      return res.status(200).json(user);
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async updateUser(req, res) {
+
+  async updateUser(req, res, next) {
     try {
-      const { name, email, id } = req.body;
-      if (!name || !email || !id) {
-        throw BaseError.BadRequest("name, email va id majburiy");
+      const { name, email } = req.body;
+      const userId = req.user.id; // XAVFSIZ: req.user.id dan olinadi!
+
+      if (!name || !email) {
+        throw BaseError.BadRequest("Ism va email kiritilishi shart");
       }
-      await userModel.findByIdAndUpdate(id, { name, email }, { new: true });
-      res.status(202).json({ message: "Updated user" });
+
+      // Agar email o'zgargan bo'lsa, boshqa foydalanuvchida yo'qligini tekshirish
+      const existingUser = await userModel.findOne({ email, _id: { $ne: userId } });
+      if (existingUser) {
+        throw BaseError.BadRequest("Ushbu email boshqa foydalanuvchi tomonidan band qilingan");
+      }
+
+      const updated = await userModel
+        .findByIdAndUpdate(userId, { name, email }, { new: true })
+        .select("-password -resetPass");
+
+      return res.status(200).json({ message: "Profil muvaffaqiyatli yangilandi", user: updated });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async updatePassword(req, res) {
+
+  async updatePassword(req, res, next) {
     try {
-      const { oldPass, newPass, id } = req.body;
-      if (!oldPass || !newPass || !id) {
-        throw BaseError.BadRequest(
-          "Eski parolingiz, Yangi parolingiz majburiy",
-        );
+      const { oldPass, newPass } = req.body;
+      const userId = req.user.id; // XAVFSIZ: req.user.id dan olinadi!
+
+      if (!oldPass || !newPass) {
+        throw BaseError.BadRequest("Eski parol va yangi parol kiritilishi shart");
       }
-      const user = await userModel.findById(id).lean();
+
+      if (String(newPass).length < 6) {
+        throw BaseError.BadRequest("Yangi parol kamida 6 belgidan iborat bo'lishi kerak");
+      }
+
+      const user = await userModel.findById(userId);
       if (!user) {
-        return res.status(404).json({ message: "User topilmadi" });
+        throw BaseError.NotFound("Foydalanuvchi topilmadi");
       }
-      const newPassword = await bcrypt.compare(String(oldPass), user.password);
-      if (!newPassword) {
-        return res.status(404).json({ message: "Parol xato" });
+
+      if (!user.password) {
+        throw BaseError.BadRequest("Ushbu akkauntda parol o'rnatilmagan, avval parol o'rnating");
       }
+
+      const isPassCorrect = await bcrypt.compare(String(oldPass), user.password);
+      if (!isPassCorrect) {
+        throw BaseError.BadRequest("Eski parol noto'g'ri kiritildi");
+      }
+
       const hashedPass = await bcrypt.hash(String(newPass), 10);
-      await userModel.findByIdAndUpdate(
-        id,
-        { password: hashedPass },
-        { new: true },
-      );
-      res.status(202).json({ message: "Load new password" });
+      user.password = hashedPass;
+      await user.save();
+
+      return res.status(200).json({ message: "Parol muvaffaqiyatli o'zgartirildi" });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async likedMovie(req, res) {
+
+  async setPasswordOAuth(req, res, next) {
     try {
-      if (!req.body) {
-        throw BaseError.BadRequest("Ma'lumotlarni to'ldiring");
+      const userId = req.user.id; // XAVFSIZ: URL param emas, tokendan olinadi!
+      const { password } = req.body;
+
+      if (!password || String(password).length < 6) {
+        throw BaseError.BadRequest("Parol kamida 6 belgidan iborat bo'lishi kerak");
       }
-      const like = await movieModel.create(req.body);
-      await userModel.findByIdAndUpdate(like.userId, {
+
+      const hashedPass = await bcrypt.hash(String(password), 10);
+      await userModel.findByIdAndUpdate(userId, { password: hashedPass }, { new: true });
+
+      return res.status(200).json({ message: "Parol muvaffaqiyatli o'rnatildi" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async likedMovie(req, res, next) {
+    try {
+      const movieData = req.body;
+      const userId = req.user.id; // XAVFSIZ: req.user dan olinadi!
+
+      if (!movieData || !movieData.id) {
+        throw BaseError.BadRequest("Film ma'lumotlari kiritilishi shart");
+      }
+
+      // Dublikat tekshiruvi
+      const existing = await movieModel.findOne({ id: movieData.id, userId });
+      if (existing) {
+        return res.status(200).json({ message: "Film allaqachon yoqtirilgan ro'yxatida mavjud", like: existing });
+      }
+
+      const like = await movieModel.create({
+        ...movieData,
+        userId,
+      });
+
+      await userModel.findByIdAndUpdate(userId, {
         $addToSet: { likedMovie: like._id },
       });
-      res.status(200).json({ message: "Succes" });
+
+      return res.status(200).json({ message: "Film yoqtirilganlarga qo'shildi", like });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async unLikedMovie(req, res) {
+
+  async unLikedMovie(req, res, next) {
     try {
-      const { id } = req.params;
-      const unLike = await movieModel.find({ id }).lean();
-      if (!unLike.length) {
-        return res.status(404).json({ message: "Movie topilmadi" });
+      const movieId = Number(req.params.id);
+      const userId = req.user.id; // XAVFSIZ: faqat joriy foydalanuvchining filmini o'chiramiz!
+
+      const unLike = await movieModel.findOneAndDelete({ id: movieId, userId });
+      if (!unLike) {
+        return res.status(404).json({ message: "Film yoqtirilganlar ro'yxatida topilmadi" });
       }
-      await movieModel.findByIdAndDelete(unLike[0]._id);
-      res.status(200).json({ message: "UnLike succes" });
+
+      await userModel.findByIdAndUpdate(userId, {
+        $pull: { likedMovie: unLike._id },
+      });
+
+      return res.status(200).json({ message: "Film yoqtirilganlardan o'chirildi" });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async LikeMovie(req, res) {
+
+  async LikeMovie(req, res, next) {
     try {
-      const { id } = req.params;
-      if (!id) {
-        throw BaseError.BadRequest("Id o'rnating");
-      }
-      const movie = await movieModel.find({ userId: id }).lean();
-      if (!movie) {
-        return res.status(404).json({ message: "Movie topilmadi" });
-      }
-      res.status(200).json(movie);
+      // Agar id berilgan bo'lsa va u admin bo'lmasa, o'zinikini yoki parametrnikini ko'radi
+      const userId = req.params.id || req.user.id;
+      const movies = await movieModel.find({ userId }).sort({ createdAt: -1 }).lean();
+      return res.status(200).json(movies);
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async savedMovie(req, res) {
+
+  async savedMovie(req, res, next) {
     try {
-      if (!req.body) {
-        throw BaseError.BadRequest("Ma'lumotlarni to'ldiring");
+      const movieData = req.body;
+      const userId = req.user.id; // XAVFSIZ!
+
+      if (!movieData || !movieData.id) {
+        throw BaseError.BadRequest("Film ma'lumotlari kiritilishi shart");
       }
-      const save = await savedMovieModel.create(req.body);
-      await userModel.findByIdAndUpdate(save.userId, {
+
+      const existing = await savedMovieModel.findOne({ id: movieData.id, userId });
+      if (existing) {
+        return res.status(200).json({ message: "Film allaqachon saqlangan", save: existing });
+      }
+
+      const save = await savedMovieModel.create({
+        ...movieData,
+        userId,
+      });
+
+      await userModel.findByIdAndUpdate(userId, {
         $addToSet: { savedMovie: save._id },
       });
-      res.status(200).json({ message: "Succes" });
+
+      return res.status(200).json({ message: "Film saqlanganlarga qo'shildi", save });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async unSavedMovie(req, res) {
+
+  async unSavedMovie(req, res, next) {
     try {
-      const { id } = req.params;
-      const unSave = await savedMovieModel.find({ id }).lean();
-      if (!unSave.length) {
-        return res.status(404).json({ message: "Movie topilmadi" });
+      const movieId = Number(req.params.id);
+      const userId = req.user.id; // XAVFSIZ!
+
+      const unSave = await savedMovieModel.findOneAndDelete({ id: movieId, userId });
+      if (!unSave) {
+        return res.status(404).json({ message: "Film saqlanganlar ro'yxatida topilmadi" });
       }
-      await savedMovieModel.findByIdAndDelete(unSave[0]._id);
-      res.status(200).json({ message: "Unsave succes" });
+
+      await userModel.findByIdAndUpdate(userId, {
+        $pull: { savedMovie: unSave._id },
+      });
+
+      return res.status(200).json({ message: "Film saqlanganlardan o'chirildi" });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async SavedMovie(req, res) {
+
+  async SavedMovie(req, res, next) {
     try {
-      const { id } = req.params;
-      if (!id) {
-        throw BaseError.BadRequest("Id o'rnating");
-      }
-      const movie = await savedMovieModel.find({ userId: id }).lean();
-      if (!movie) {
-        return res.status(404).json({ message: "Movie topilmadi" });
-      }
-      res.status(200).json(movie);
+      const userId = req.params.id || req.user.id;
+      const movies = await savedMovieModel.find({ userId }).sort({ createdAt: -1 }).lean();
+      return res.status(200).json(movies);
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async addAvatar(req, res) {
+
+  async addAvatar(req, res, next) {
     try {
       const { url } = req.body;
       if (!url) {
-        throw BaseError.BadRequest("Url majburiy");
+        throw BaseError.BadRequest("Rasm manzili (URL) kiritilishi shart");
       }
-      await userModel.findByIdAndUpdate(
-        req.user.id,
-        { avatar: url },
-        { new: true },
-      );
-      res.status(200).json({ message: "Upload Completed" });
+      const updatedUser = await userModel
+        .findByIdAndUpdate(req.user.id, { avatar: url }, { new: true })
+        .select("-password -resetPass");
+
+      return res.status(200).json({ message: "Avatar muvaffaqiyatli yuklandi", user: updatedUser });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
     }
   }
-  async setPasswordOAuth(req, res) {
+
+  // Tezkor parallel TMDB so'rovlari
+  async getAPI(req, res, next) {
     try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(404).json({ message: "Id o'rnating" });
+      const apiKey = process.env.TMDB_KEY_API;
+      if (!apiKey) {
+        throw BaseError.BadRequest("TMDB API kaliti mavjud emas");
       }
-      const { password } = req.body;
-      if (!password) {
-        return res.status(404).json({ message: "Password o'rnating" });
-      }
-      const hashedPass = await bcrypt.hash(password, 10);
-      await userModel.findByIdAndUpdate(
-        id,
-        { password: hashedPass },
-        { new: true },
-      );
-      res.status(200).json({ message: "Password success" });
-    } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
-    }
-  }
-  async getAPI(req, res) {
-    try {
-      const upcoming = await fetch(
-        `https://api.themoviedb.org/3/movie/upcoming?api_key=${process.env.TMDB_KEY_API}`,
-      );
-      const action = await fetch(
-        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=28`,
-      );
-      const comedy = await fetch(
-        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=35`,
-      );
-      const horror = await fetch(
-        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=27`,
-      );
-      const animation = await fetch(
-        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.TMDB_KEY_API}&with_genres=16`,
-      );
-      const upcomingJSON = await upcoming.json(),
-        actionJSON = await action.json(),
-        comedyJSON = await comedy.json(),
-        horrorJSON = await horror.json(),
-        animationJSON = await animation.json();
-      res.status(200).json({
-        upcomingJSON,
-        actionJSON,
-        comedyJSON,
-        horrorJSON,
-        animationJSON,
+
+      const [upcomingRes, actionRes, comedyRes, horrorRes, animationRes] = await Promise.all([
+        axios.get(`https://api.themoviedb.org/3/movie/upcoming?api_key=${apiKey}`),
+        axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=28`),
+        axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=35`),
+        axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=27`),
+        axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&with_genres=16`),
+      ]);
+
+      return res.status(200).json({
+        upcomingJSON: upcomingRes.data,
+        actionJSON: actionRes.data,
+        comedyJSON: comedyRes.data,
+        horrorJSON: horrorRes.data,
+        animationJSON: animationRes.data,
       });
     } catch (error) {
-      throw BaseError.BadRequest("Xatolik iltimos keyinroq urining", error);
+      next(error);
+    }
+  }
+
+  // Telegram bot orqali xavfsiz fikr-mulohaza (feedback) yuborish
+  async sendFeedback(req, res, next) {
+    try {
+      const { name, email, message, feedbackType, rating } = req.body;
+
+      if (!message || !email) {
+        throw BaseError.BadRequest("Email va xabar matni kiritilishi shart");
+      }
+
+      const botToken = process.env.TELEGRAM_TOKEN_BOT || process.env.NEXT_PUBLIC_TOKEN_BOT;
+      const chatId = process.env.TELEGRAM_CHAT_ID || process.env.NEXT_PUBLIC_CHAT_ID;
+
+      if (!botToken || !chatId) {
+        return res.status(200).json({ message: "Xabar qabul qilindi (Bot sozlanmagan)" });
+      }
+
+      const emoji = {
+        general: "📝",
+        bug: "🐛",
+        feature: "💡",
+        other: "❓",
+      };
+
+      const typeEmoji = emoji[feedbackType] || "📝";
+      const ratingStars = "⭐".repeat(Number(rating) || 0) + "☆".repeat(Math.max(0, 5 - (Number(rating) || 0)));
+
+      const text = `${typeEmoji} Yangi Fikr-mulohaza (Netflix Clone):\n` +
+        `• Turi: ${(feedbackType || "general").toUpperCase()}\n` +
+        `• Ism: ${name || "Ko'rsatilmadi"}\n` +
+        `• Email: ${email}\n` +
+        `• Baho: ${ratingStars} (${rating || 0}/5)\n` +
+        `• Xabar:\n${message}\n\n` +
+        `📅 Sana: ${new Date().toLocaleString()}`;
+
+      await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        chat_id: chatId,
+        text,
+      });
+
+      return res.status(200).json({ message: "Fikr-mulohazangiz muvaffaqiyatli yuborildi!" });
+    } catch (error) {
+      next(error);
     }
   }
 }
+
 module.exports = new UserController();

@@ -2,7 +2,11 @@ const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const authController = require("../controllers/auth.controller");
 const authMiddleware = require("../middleware/auth.middleware");
+const { getCookieOptions } = require("../utils/cookie");
 const router = require("express").Router();
+
+const CLIENT_URL = process.env.PRIVATE_CLIENT_URL || "http://localhost:3000";
+
 // Google start
 router.get(
   "/auth/google",
@@ -11,17 +15,19 @@ router.get(
     session: false,
   }),
 );
+
 // GitHub start
 router.get(
   "/auth/github",
   passport.authenticate("github", { scope: ["user:email"], session: false }),
 );
+
 // Google callback
 router.get(
   "/auth/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: "http://localhost:3000/auth/signin",
+    failureRedirect: `${CLIENT_URL}/auth/signin`,
   }),
   (req, res) => {
     const payload = {
@@ -32,22 +38,18 @@ router.get(
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true,
-          sameSite: "none",
-      maxAge: 24 * 60 * 60 * 1000,
-      path: "/",
-    });
-    return res.redirect("http://localhost:3000/");
+
+    res.cookie("token", token, getCookieOptions());
+    return res.redirect(`${CLIENT_URL}/`);
   },
 );
+
 // GitHub callback
 router.get(
   "/auth/github/callback",
   passport.authenticate("github", {
     session: false,
-    failureRedirect: "http://localhost:3000/auth/signin",
+    failureRedirect: `${CLIENT_URL}/auth/signin`,
   }),
   (req, res) => {
     const payload = {
@@ -58,21 +60,22 @@ router.get(
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true,
-          sameSite: "none",
-      maxAge: 24 * 60 * 60 * 1000,
-      path: "/",
-    });
-    return res.redirect("http://localhost:3000/");
+
+    res.cookie("token", token, getCookieOptions());
+    return res.redirect(`${CLIENT_URL}/`);
   },
 );
+
 router.post("/login", authController.login);
 router.post("/register", authController.register);
 router.get("/me", authMiddleware, authController.me);
 router.post("/logout", authController.logout);
+
+// Profil ichidan 6 xonali maxfiy kodni saqlash (tizimga kirgan holda)
 router.post("/reset-pass", authMiddleware, authController.resetPass);
-router.post("/reset", authMiddleware, authController.reset);
-router.post("/new-password", authMiddleware, authController.newPassword);
+
+// Parolni unutganda tekshirish va yangi parol o'rnatish (tizimga kirmagan holda)
+router.post("/reset", authController.reset);
+router.post("/new-password", authController.newPassword);
+
 module.exports = router;

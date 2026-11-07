@@ -29,7 +29,7 @@ passport.use(
           }
           await user.save();
         }
-        return done(null, user)
+        return done(null, user);
       } catch (error) {
         return done(error, null);
       }
