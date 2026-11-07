@@ -40,15 +40,70 @@ app.use(
   }),
 );
 
-app.get("/health", (req, res) => {
+let cachedDb = null;
+let lastDbError = null;
+
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    lastDbError = null;
+    return mongoose.connection;
+  }
+  try {
+    if (!process.env.MONGO_URL) {
+      const msg = "Xatolik: MONGO_URL muhit o'zgaruvchisi topilmadi!";
+      console.error("❌ " + msg);
+      lastDbError = { message: msg, time: new Date().toISOString() };
+      return null;
+    }
+    cachedDb = await mongoose.connect(process.env.MONGO_URL, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    console.log("✅ MongoDb muvaffaqiyatli ishga tushdi");
+    lastDbError = null;
+    return cachedDb;
+  } catch (err) {
+    lastDbError = {
+      message: err.message,
+      name: err.name,
+      time: new Date().toISOString(),
+    };
+    console.error("❌ MongoDB ulanishda xatolik:", err.message);
+    return null;
+  }
+};
+
+// Dastlabki ulanish
+connectDB();
+
+app.get("/health", async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    await connectDB();
+  }
   const isDbConnected = mongoose.connection.readyState === 1;
+  const rawUrl = process.env.MONGO_URL || "";
+  const hostPart = rawUrl.includes("@")
+    ? rawUrl.split("@")[1].split("?")[0]
+    : rawUrl.slice(0, 20) || "NOT_SET";
+
   res.status(isDbConnected ? 200 : 503).json({
     status: isDbConnected ? "ok" : "db_disconnected",
     dbStatus: isDbConnected ? "Connected" : "Disconnected",
     dbReadyState: mongoose.connection.readyState,
+    hasMongoUrl: Boolean(process.env.MONGO_URL),
+    targetCluster: hostPart,
+    lastDbError: lastDbError,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
+});
+
+// Har bir so'rovda DB ulanishi tayyorligini ta'minlash (Serverless / Cold-start timeoutlaridan himoya)
+app.use(async (req, res, next) => {
+  if (req.path === "/health") return next();
+  if (mongoose.connection.readyState !== 1) {
+    await connectDB();
+  }
+  next();
 });
 
 app.use("/api", router);
@@ -58,23 +113,8 @@ app.use("/api", adminRoute);
 // Markaziy xatoliklarni ushlaydigan middleware
 app.use(errorMiddleware);
 
-const connectDB = async () => {
-  try {
-    if (!process.env.MONGO_URL) {
-      console.error("❌ Xatolik: .env faylida MONGO_URL aniqlanmagan!");
-      return;
-    }
-    await mongoose.connect(process.env.MONGO_URL, {
-      serverSelectionTimeoutMS: 8000,
-    });
-    console.log("✅ MongoDb muvaffaqiyatli ishga tushdi");
-  } catch (err) {
-    console.error("❌ MongoDB ulanishda xatolik:", err.message);
-  }
-};
-
-connectDB();
-
 app.listen(PORT, () => {
   console.log(`Server ${PORT}-portda ishga tushdi`);
 });
+
+module.exports = app;
