@@ -41,8 +41,11 @@ app.use(
 );
 
 app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "ok",
+  const isDbConnected = mongoose.connection.readyState === 1;
+  res.status(isDbConnected ? 200 : 503).json({
+    status: isDbConnected ? "ok" : "db_disconnected",
+    dbStatus: isDbConnected ? "Connected" : "Disconnected",
+    dbReadyState: mongoose.connection.readyState,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
@@ -55,10 +58,22 @@ app.use("/api", adminRoute);
 // Markaziy xatoliklarni ushlaydigan middleware
 app.use(errorMiddleware);
 
-mongoose
-  .connect(process.env.MONGO_URL)
-  .then(() => console.log("MongoDb ishga tushdi"))
-  .catch((err) => console.error("MongoDB ulanishda xatolik:", err));
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGO_URL) {
+      console.error("❌ Xatolik: .env faylida MONGO_URL aniqlanmagan!");
+      return;
+    }
+    await mongoose.connect(process.env.MONGO_URL, {
+      serverSelectionTimeoutMS: 8000,
+    });
+    console.log("✅ MongoDb muvaffaqiyatli ishga tushdi");
+  } catch (err) {
+    console.error("❌ MongoDB ulanishda xatolik:", err.message);
+  }
+};
+
+connectDB();
 
 app.listen(PORT, () => {
   console.log(`Server ${PORT}-portda ishga tushdi`);
